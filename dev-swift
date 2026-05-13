@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+export DEVELOPER_DIR="${DEVELOPER_DIR:-/System/Volumes/Data/Applications/Xcode.app/Contents/Developer}"
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT_DIR"
+
+APP_NAME="$(rtk yq -r '.name' project.yml)"
+if [[ -z "$APP_NAME" || "$APP_NAME" == "null" ]]; then
+  echo "error: could not read name from project.yml" >&2
+  exit 1
+fi
+
+BUILD_DIR="$ROOT_DIR/.build/DerivedData"
+OPEN_APP=1
+CLEAN_BUILD=0
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-open)
+      OPEN_APP=0
+      ;;
+    --clean)
+      CLEAN_BUILD=1
+      ;;
+    *)
+      echo "error: unsupported arg: $arg" >&2
+      echo "usage: ./dev-swift [--clean] [--no-open]" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$CLEAN_BUILD" -eq 1 ]]; then
+  rtk rm -rf "$BUILD_DIR"
+fi
+
+rtk xcodegen generate
+
+rtk xcodebuild \
+  -project "${APP_NAME}.xcodeproj" \
+  -scheme "$APP_NAME" \
+  -configuration Debug \
+  -derivedDataPath "$BUILD_DIR" \
+  CODE_SIGN_IDENTITY="-" \
+  CODE_SIGNING_REQUIRED=NO \
+  build
+
+APP_PATH="$(rtk fd -a "${APP_NAME}.app" "$BUILD_DIR/Build/Products/Debug" -t d | rtk head -n 1)"
+if [[ -z "${APP_PATH}" ]]; then
+  echo "error: built app not found under $BUILD_DIR" >&2
+  exit 1
+fi
+
+echo "Debug app: $APP_PATH"
+
+if [[ "$OPEN_APP" -eq 1 ]]; then
+  rtk open "$APP_PATH"
+fi
