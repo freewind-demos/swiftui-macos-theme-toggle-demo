@@ -4,7 +4,7 @@ if test -z "$ROOT_DIR"
     set -gx ROOT_DIR (pwd)
 end
 if test -z "$DEVELOPER_DIR"
-    set -gx DEVELOPER_DIR /System/Volumes/Data/Applications/Xcode.app/Contents/Developer
+    set -gx DEVELOPER_DIR /Applications/Xcode.app/Contents/Developer
 end
 
 set -g SCRIPT_NAME (basename (status filename))
@@ -72,6 +72,15 @@ function print_matches
     end
 end
 
+function filter_xcode_container_paths
+    for path_value in $argv
+        if string match -qr '\.xcodeproj/[^/]+\.xcworkspace/?$' -- "$path_value"
+            continue
+        end
+        printf '%s\n' "$path_value"
+    end
+end
+
 function set_project_context
     set -l project_path "$argv[1]"
     switch "$project_path"
@@ -99,7 +108,7 @@ function collect_named_xcode_projects
     begin
         fd -HI -a -t d -g "$name.xcworkspace" "$root" --exclude .git --exclude build --exclude DerivedData --exclude .build
         fd -HI -a -t d -g "$name.xcodeproj" "$root" --exclude .git --exclude build --exclude DerivedData --exclude .build
-    end
+    end | filter_xcode_container_paths
 end
 
 function collect_all_xcode_projects
@@ -107,7 +116,7 @@ function collect_all_xcode_projects
     begin
         fd -HI -a -t d -g '*.xcworkspace' "$root" --exclude .git --exclude build --exclude DerivedData --exclude .build
         fd -HI -a -t d -g '*.xcodeproj' "$root" --exclude .git --exclude build --exclude DerivedData --exclude .build
-    end
+    end | filter_xcode_container_paths
 end
 
 function collect_package_specs
